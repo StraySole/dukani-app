@@ -4,7 +4,17 @@ import { Plus, Pencil, Trash2, Package, Minus, X, Check, Search, ScanLine, Loade
 import { useStore, Product } from '../context/StoreContext';
 import { BottomNav } from './BottomNav';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
-import egyptianProducts from '../data/egyptian_products.json'; // القاعدة المحلية السريعة بدون إنترنت
+
+// قاعدة البيانات المحلية المدمجة للمنتجات المصرية الشائعة (تعمل بدون إنترنت وتمنع أخطاء المسار)
+const EGYPTIAN_PRODUCTS_DB = [
+  { barcode: '6221003090013', name: 'حليب جهينة 1 لتر', defaultPrice: 45 },
+  { barcode: '6222001150012', name: 'شيبسي عائلي طماطم', defaultPrice: 10 },
+  { barcode: '6223004120015', name: 'جبنة تتراباك عبور لاند 500جم', defaultPrice: 30 },
+  { barcode: '6221148201019', name: 'مكرونة الملكة 400جم', defaultPrice: 22 },
+  { barcode: '6221016020010', name: 'زيت عافية ذرة 800مل', defaultPrice: 95 },
+  { barcode: '6224001230018', name: 'سكر المصريين 1كجم', defaultPrice: 35 },
+  { barcode: '6221155112233', name: 'شاي العروسة 250جم', defaultPrice: 60 }
+];
 
 function NumInput({ label, value, onChange, min = 0, step = 1 }: { label: string; value: number; onChange: (v: number) => void; min?: number; step?: number }) {
   return (
@@ -77,7 +87,7 @@ export function Products() {
     setDeleteConfirm(null);
   };
 
-  // 🛡️ نظام المسح الذكي (يعمل بدون إنترنت محلياً، وإن وجد إنترنت يبحث عالمياً)
+  // نظام المسح الذكي والهجين (محلي سريع + سحابي عند توفر الإنترنت)
   const handleSmartScan = async () => {
     try {
       const permission = await BarcodeScanner.checkPermission({ force: true });
@@ -95,8 +105,8 @@ export function Products() {
       if (result.barcodes && result.barcodes.length > 0) {
         const scannedCode = result.barcodes[0].rawValue;
 
-        // 1. البحث أولاً في القاعدة المحلية (تعمل بدون إنترنت نهائياً وبسرعة برقية)
-        const localFound = egyptianProducts.find(p => p.barcode === scannedCode);
+        // 1. البحث محلياً أولاً بدون إنترنت
+        const localFound = EGYPTIAN_PRODUCTS_DB.find(p => p.barcode === scannedCode);
         if (localFound) {
           addProduct({
             name: localFound.name,
@@ -108,14 +118,14 @@ export function Products() {
           return;
         }
 
-        // 2. إن لم يوجد محلياً، نحاول البحث عبر الإنترنت (إن كان متاحاً)
+        // 2. التحقق من الإنترنت
         if (!navigator.onLine) {
-          alert(`الباركود (${scannedCode}) غير موجود في الذاكرة المحلية، ولا يوجد اتصال بالإنترنت. يجدر إضافته يدوياً.`);
+          alert(`الباركود (${scannedCode}) غير موجود محلياً ولا يوجد اتصال بالإنترنت. يرجى إضافته يدوياً.`);
           navigate('/add-product');
           return;
         }
 
-        // 3. الاتصال بالسحابة لجلب المنتج إذا كان الإنترنت متوفراً
+        // 3. الاستعلام السحابي الحي
         setIsScanning(true);
         const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${scannedCode}.json`, {
           headers: { 'User-Agent': 'DukaniApp/1.0' }
@@ -173,7 +183,7 @@ export function Products() {
 
         <div className="px-6 py-4 space-y-4">
           {/* Search */}
-          <div className="struct relative">
+          <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
