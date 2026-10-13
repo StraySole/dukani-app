@@ -38,11 +38,21 @@ jobs:
           npx cap add android || true
           npx cap sync android
 
-      - name: Build Android APK with Detailed Stacktrace
+      - name: Fix minSdkVersion for ML Kit Plugins
+        run: |
+          if [ -f android/variables.gradle ]; then
+            sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 24/g' android/variables.gradle
+          fi
+          # احتياطياً في حال كان الملف الرئيسي هو build.gradle
+          if [ -f android/build.gradle ]; then
+            sed -i 's/minSdkVersion [0-9]*/minSdkVersion 24/g' android/build.gradle
+          fi
+
+      - name: Build Android APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
