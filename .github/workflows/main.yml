@@ -31,16 +31,19 @@ jobs:
 
     - name: Add & Sync Capacitor Android
       run: |
-        npm install @capacitor/android
-        npx cap add android || true
-        npx cap sync android
+          npm install @capacitor/android @capacitor/assets
+          npx cap add android || true
+          npx cap sync android
+
+    - name: Generate App Assets
+      run: npx @capacitor/assets generate --android
 
     - name: Build APK with Gradle
       run: |
-        cd android
-        chmod +x gradlew
-        ./gradlew assembleDebug
-
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
