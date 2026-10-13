@@ -13,12 +13,28 @@ export function QuickSale() {
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const addToCart = (id: number) => setCart(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
+  // دالة الإضافة مع التحقق الصارم من المخزون
+  const addToCart = (id: number) => {
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+
+    const currentQtyInCart = cart[id] || 0;
+    
+    // شرط منع إضافة كمية أكبر من المتاح في المخزون
+    if (currentQtyInCart + 1 > product.quantity) {
+      alert(`عذراً! الكمية المطلوبة غير متوفرة. المتاح في المخزون فقط: ${product.quantity} قطعة.`);
+      return;
+    }
+
+    setCart(prev => ({ ...prev, [id]: currentQtyInCart + 1 }));
+  };
+
   const removeFromCart = (id: number) => setCart(prev => {
     const qty = (prev[id] || 0) - 1;
     if (qty <= 0) { const n = { ...prev }; delete n[id]; return n; }
     return { ...prev, [id]: qty };
   });
+
   const clearItem = (id: number) => setCart(prev => { const n = { ...prev }; delete n[id]; return n; });
 
   const total = Object.entries(cart).reduce((sum, [id, qty]) => {
@@ -33,6 +49,15 @@ export function QuickSale() {
 
   const handleConfirmSale = () => {
     if (cartItems.length === 0) return;
+    
+    // التحقق النهائي قبل إتمام عملية البيع
+    for (const { product, qty } of cartItems) {
+      if (qty > product.quantity) {
+        alert(`عذراً، المنتج "${product.name}" الكمية المباعة (${qty}) تتجاوز المخزون المتاح (${product.quantity})!`);
+        return;
+      }
+    }
+
     addSale(cartItems.map(({ product, qty }) => ({
       productId: product.id,
       productName: product.name,
@@ -134,8 +159,8 @@ export function QuickSale() {
                 <span className="font-bold">{cart[product.id]}</span>
               </div>
             ) : (
-              <div className="w-10 h-8 bg-gray-200 rounded-lg text-center">
-                <span className="text-xs text-gray-400 leading-8">كمية: {product.quantity}</span>
+              <div className="w-16 h-8 bg-gray-200 rounded-lg text-center">
+                <span className="text-xs text-gray-600 leading-8 font-medium">مخزون: {product.quantity}</span>
               </div>
             )}
           </div>
