@@ -24,11 +24,11 @@ jobs:
           npm install
           npm install @capacitor/android @capacitor/assets @capacitor/push-notifications @capacitor-mlkit/barcode-scanning @capacitor/local-notifications
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Build Web App
         run: npm run build
@@ -38,12 +38,11 @@ jobs:
           npx cap add android || true
           npx cap sync android
 
-      - name: Fix minSdkVersion for ML Kit Plugins
+      - name: Fix minSdkVersion for Android
         run: |
           if [ -f android/variables.gradle ]; then
             sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 24/g' android/variables.gradle
           fi
-          # احتياطياً في حال كان الملف الرئيسي هو build.gradle
           if [ -f android/build.gradle ]; then
             sed -i 's/minSdkVersion [0-9]*/minSdkVersion 24/g' android/build.gradle
           fi
