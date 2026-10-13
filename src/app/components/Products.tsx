@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Plus, Pencil, Trash2, Package, Minus, X, Check, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Minus, X, Check, Search, ScanLine } from 'lucide-react';
 import { useStore, Product } from '../context/StoreContext';
 import { BottomNav } from './BottomNav';
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
+import egyptianProducts from '../data/egyptian_products.json';
 
 function NumInput({ label, value, onChange, min = 0, step = 1 }: { label: string; value: number; onChange: (v: number) => void; min?: number; step?: number }) {
   return (
@@ -34,7 +36,7 @@ function NumInput({ label, value, onChange, min = 0, step = 1 }: { label: string
 
 export function Products() {
   const navigate = useNavigate();
-  const { products, updateProduct, deleteProduct } = useStore();
+  const { products, updateProduct, deleteProduct, addProduct } = useStore();
   const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
@@ -74,19 +76,67 @@ export function Products() {
     setDeleteConfirm(null);
   };
 
+  // دالة مسح الباركود والبحث التلقائي في المنتجات المصرية
+  const handleScanAndAdd = async () => {
+    try {
+      const permission = await BarcodeScanner.checkPermission({ force: true });
+      if (!permission.granted) {
+        alert('يرجى السماح بالتطبيق باستخدام الكاميرا لمسح الباركود');
+        return;
+      }
+
+      document.querySelector('body')?.classList.add('barcode-scanner-active');
+      const result = await BarcodeScanner.scan();
+      document.querySelector('body')?.classList.remove('barcode-scanner-active');
+
+      if (result.barcodes && result.barcodes.length > 0) {
+        const scannedCode = result.barcodes[0].rawValue;
+        
+        // البحث عن المنتج في قاعدة البيانات المصرية المقترحة
+        const found = egyptianProducts.find(p => p.barcode === scannedCode);
+
+        if (found) {
+          // إضافة المنتج مباشرة إلى متجر المستخدم بالسعر الافتراضي
+          addProduct({
+            name: found.name,
+            price: found.defaultPrice,
+            quantity: 10, // كمية ابتدائية افتراضية
+            boxes: 1,
+          });
+          alert(`تم العثور على المنتج وإضافته بنجاح: ${found.name}`);
+        } else {
+          alert(`الباركود (${scannedCode}) غير موجود بقاعدة البيانات المصرية المحلية. يمكنك إضافته يدوياً.`);
+          navigate('/add-product');
+        }
+      }
+    } catch (error) {
+      document.querySelector('body')?.classList.remove('barcode-scanner-active');
+      console.error('Scan error:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white flex flex-col" dir="rtl">
       <div className="flex-1 pb-20">
         {/* Header */}
         <div className="bg-white px-6 py-4 flex items-center justify-between border-b sticky top-0 z-10">
-          <button
-            onClick={() => navigate('/add-product')}
-            className="w-10 h-10 bg-[#1B5E20] rounded-xl flex items-center justify-center hover:bg-[#145018] transition-colors"
-          >
-            <Plus className="w-5 h-5 text-white" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/add-product')}
+              className="w-10 h-10 bg-[#1B5E20] rounded-xl flex items-center justify-center hover:bg-[#145018] transition-colors"
+              title="إضافة يدوية"
+            >
+              <Plus className="w-5 h-5 text-white" />
+            </button>
+            <button
+              onClick={handleScanAndAdd}
+              className="h-10 px-3 bg-amber-600 text-white rounded-xl flex items-center gap-1.5 hover:bg-amber-700 transition-colors text-sm font-semibold"
+            >
+              <ScanLine className="w-4 h-4" />
+              <span>مسح باركود</span>
+            </button>
+          </div>
           <h2 className="text-xl font-semibold">المنتجات</h2>
-          <div className="w-10" />
         </div>
 
         <div className="px-6 py-4 space-y-4">
@@ -111,7 +161,7 @@ export function Products() {
             <div className="text-center py-16">
               <Package className="w-16 h-16 text-gray-200 mx-auto mb-4" />
               <p className="text-gray-400 text-lg">لا توجد منتجات</p>
-              <p className="text-gray-400 text-sm mt-1">اضغط + لإضافة أول منتج</p>
+              <p className="text-gray-400 text-sm mt-1">اضغط زر + أو مسح الباركود لإضافة أول منتج</p>
             </div>
           )}
 
