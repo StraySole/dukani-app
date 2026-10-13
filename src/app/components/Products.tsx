@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Plus, Pencil, Trash2, Package, Minus, X, Check, Search, ScanLine } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Minus, X, Check, Search, ScanLine, Loader2 } from 'lucide-react';
 import { useStore, Product } from '../context/StoreContext';
 import { BottomNav } from './BottomNav';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
-import egyptianProducts from '../data/egyptian_products.json';
+import egyptianProducts from '../data/egyptian_products.json'; // القاعدة المحلية السريعة بدون إنترنت
 
 function NumInput({ label, value, onChange, min = 0, step = 1 }: { label: string; value: number; onChange: (v: number) => void; min?: number; step?: number }) {
   return (
@@ -40,6 +40,7 @@ export function Products() {
   const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
 
   // Edit form state
   const [editName, setEditName] = useState('');
@@ -76,8 +77,8 @@ export function Products() {
     setDeleteConfirm(null);
   };
 
-  // دالة مسح الباركود والبحث التلقائي في المنتجات المصرية
-  const handleScanAndAdd = async () => {
+  // 🛡️ نظام المسح الذكي (يعمل بدون إنترنت محلياً، وإن وجد إنترنت يبحث عالمياً)
+  const handleSmartScan = async () => {
     try {
       const permission = await BarcodeScanner.checkPermission({ force: true });
       if (!permission.granted) {
@@ -86,32 +87,62 @@ export function Products() {
       }
 
       document.querySelector('body')?.classList.add('barcode-scanner-active');
+      setIsScanning(true);
       const result = await BarcodeScanner.scan();
       document.querySelector('body')?.classList.remove('barcode-scanner-active');
+      setIsScanning(false);
 
       if (result.barcodes && result.barcodes.length > 0) {
         const scannedCode = result.barcodes[0].rawValue;
-        
-        // البحث عن المنتج في قاعدة البيانات المصرية المقترحة
-        const found = egyptianProducts.find(p => p.barcode === scannedCode);
 
-        if (found) {
-          // إضافة المنتج مباشرة إلى متجر المستخدم بالسعر الافتراضي
+        // 1. البحث أولاً في القاعدة المحلية (تعمل بدون إنترنت نهائياً وبسرعة برقية)
+        const localFound = egyptianProducts.find(p => p.barcode === scannedCode);
+        if (localFound) {
           addProduct({
-            name: found.name,
-            price: found.defaultPrice,
-            quantity: 10, // كمية ابتدائية افتراضية
+            name: localFound.name,
+            price: localFound.defaultPrice,
+            quantity: 10,
             boxes: 1,
           });
-          alert(`تم العثور على المنتج وإضافته بنجاح: ${found.name}`);
+          alert(`✨ تم العثور على المنتج محلياً وإضافته:\n${localFound.name}`);
+          return;
+        }
+
+        // 2. إن لم يوجد محلياً، نحاول البحث عبر الإنترنت (إن كان متاحاً)
+        if (!navigator.onLine) {
+          alert(`الباركود (${scannedCode}) غير موجود في الذاكرة المحلية، ولا يوجد اتصال بالإنترنت. يجدر إضافته يدوياً.`);
+          navigate('/add-product');
+          return;
+        }
+
+        // 3. الاتصال بالسحابة لجلب المنتج إذا كان الإنترنت متوفراً
+        setIsScanning(true);
+        const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${scannedCode}.json`, {
+          headers: { 'User-Agent': 'DukaniApp/1.0' }
+        });
+        const data = await response.json();
+        setIsScanning(false);
+
+        if (data.status === 1 && data.product) {
+          const productName = data.product.product_name || data.product.product_name_ar || 'منتج جديد';
+          addProduct({
+            name: productName,
+            price: 10,
+            quantity: 10,
+            boxes: 1,
+          });
+          alert(`🌐 تم الجلب من السحابة وإضافة المنتج:\n${productName}`);
         } else {
-          alert(`الباركود (${scannedCode}) غير موجود بقاعدة البيانات المصرية المحلية. يمكنك إضافته يدوياً.`);
+          alert(`الباركود (${scannedCode}) غير مسجل. يرجى إضافته يدوياً.`);
           navigate('/add-product');
         }
+
       }
     } catch (error) {
       document.querySelector('body')?.classList.remove('barcode-scanner-active');
-      console.error('Scan error:', error);
+      setIsScanning(false);
+      console.error('Smart Scan Error:', error);
+      alert('حدث خطأ أثناء فحص الباركود.');
     }
   };
 
@@ -129,11 +160,12 @@ export function Products() {
               <Plus className="w-5 h-5 text-white" />
             </button>
             <button
-              onClick={handleScanAndAdd}
-              className="h-10 px-3 bg-amber-600 text-white rounded-xl flex items-center gap-1.5 hover:bg-amber-700 transition-colors text-sm font-semibold"
+              onClick={handleSmartScan}
+              disabled={isScanning}
+              className="h-10 px-3 bg-amber-600 text-white rounded-xl flex items-center gap-1.5 hover:bg-amber-700 transition-colors text-sm font-semibold disabled:opacity-50"
             >
-              <ScanLine className="w-4 h-4" />
-              <span>مسح باركود</span>
+              {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
+              <span>{isScanning ? 'جاري البحث...' : 'مسح باركود ذكي'}</span>
             </button>
           </div>
           <h2 className="text-xl font-semibold">المنتجات</h2>
@@ -141,7 +173,7 @@ export function Products() {
 
         <div className="px-6 py-4 space-y-4">
           {/* Search */}
-          <div className="relative">
+          <div className="struct relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
@@ -161,7 +193,7 @@ export function Products() {
             <div className="text-center py-16">
               <Package className="w-16 h-16 text-gray-200 mx-auto mb-4" />
               <p className="text-gray-400 text-lg">لا توجد منتجات</p>
-              <p className="text-gray-400 text-sm mt-1">اضغط زر + أو مسح الباركود لإضافة أول منتج</p>
+              <p className="text-gray-400 text-sm mt-1">اضغط زر + أو مسح الباركود الذكي لإضافة أول منتج</p>
             </div>
           )}
 
