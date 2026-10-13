@@ -13,11 +13,36 @@ export function Login() {
 
   useEffect(() => {
     if (user) navigate('/home');
-  }, []);
+  }, [user, navigate]);
 
   const handleLogin = () => {
-    if (!name.trim()) { setError('من فضلك أدخل اسمك'); return; }
-    if (!contact.trim()) { setError('من فضلك أدخل ' + (contactType === 'phone' ? 'رقم الهاتف' : 'البريد الإلكتروني')); return; }
+    if (!name.trim()) { 
+      setError('من فضلك أدخل اسمك'); 
+      return; 
+    }
+    if (!contact.trim()) { 
+      setError('من فضلك أدخل ' + (contactType === 'phone' ? 'رقم الهاتف' : 'البريد الإلكتروني')); 
+      return; 
+    }
+
+    // التحقق الصارم من صحة الإيميل (يجب أن يحتوي على @ و نقطة لضمان عدم قبوله بشكل عشوائي)
+    if (contactType === 'email') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(contact.trim())) {
+        setError('البريد الإلكتروني غير صحيح، يرجى كتابة بريد صالح (مثل: name@domain.com)');
+        return;
+      }
+    }
+
+    // التحقق الصارم من رقم الهاتف (أرقام فقط وبطول مناسب مثلاً 10 إلى 11 رقم)
+    if (contactType === 'phone') {
+      const phoneRegex = /^[0-9]{10,11}$/;
+      if (!phoneRegex.test(contact.trim())) {
+        setError('رقم الهاتف غير صحيح، يجب أن يتكون من 10 أو 11 رقماً');
+        return;
+      }
+    }
+
     setUser({ name: name.trim(), contact: contact.trim(), contactType });
     navigate('/home');
   };
@@ -74,12 +99,12 @@ export function Login() {
               value={contact}
               onChange={e => { setContact(e.target.value); setError(''); }}
               placeholder={contactType === 'phone' ? '01xxxxxxxxx' : 'example@email.com'}
-              className="w-full h-14 px-4 bg-[#F5F5F5] rounded-xl text-right text-lg outline-none focus:ring-2 focus:ring-[#1B5E20]"
+              className="w-full h-14 px-4 bg-[#F5F5F5] rounded-xl text-lg outline-none focus:ring-2 focus:ring-[#1B5E20]"
               dir={contactType === 'email' ? 'ltr' : 'rtl'}
             />
           </div>
 
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+          {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
 
           <button
             onClick={handleLogin}
